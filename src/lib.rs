@@ -59,14 +59,14 @@ fn get_hot_data(fd: c_int) -> Result<hot_data, Error> {
 }
 
 #[cfg(test)]
-struct HotDataSupportingFixture {
+struct HotDataFixture {
     base_dir : std::path::PathBuf,
     fs_image_file : std::fs::File,
     fs_image_dir : std::path::PathBuf
 }
 
 #[cfg(test)]
-impl Drop for HotDataSupportingFixture {
+impl Drop for HotDataFixture {
     fn drop(&mut self) {
         assert!(Command::new("sudo").arg("umount").arg(&self.base_dir.as_os_str()).status().is_ok());
         assert!(std::fs::remove_dir_all(&self.base_dir).is_ok());
@@ -78,8 +78,8 @@ impl Drop for HotDataSupportingFixture {
 use std::process::Command;
 
 #[cfg(test)]
-impl HotDataSupportingFixture {
-    fn new_btrfs() -> HotDataSupportingFixture {
+impl HotDataFixture {
+    fn new(mkfs_command : &str) -> HotDataFixture {
         let tmpdir = rustc_back::tempdir::TempDir::new("hot-data-test").unwrap();
         let image_path = tmpdir.path().join("btrfs-image");
         let mount_dir = tmpdir.path().join("btrfs-mount-point");
@@ -90,33 +90,13 @@ impl HotDataSupportingFixture {
 
         assert!(std::fs::create_dir(&mount_dir).is_ok());
 
-        assert!(Command::new("mkfs.btrfs").arg(&image_path.as_os_str()).status().is_ok());
+        assert!(Command::new(mkfs_command).arg(&image_path.as_os_str()).status().is_ok());
         assert!(Command::new("sudo").arg("mount").arg("-o").arg("hot_track").arg(&image_path.as_os_str()).arg(&mount_dir.as_os_str()).status().is_ok());
         assert!(Command::new("sudo").arg("chmod").arg("777").arg(&mount_dir.as_os_str()).status().is_ok());
 
-        HotDataSupportingFixture { base_dir : mount_dir,
-                                   fs_image_file : image_file,
-                                   fs_image_dir : tmpdir.into_path() }
-    }
-
-    fn new_xfs() -> HotDataSupportingFixture {
-        let tmpdir = rustc_back::tempdir::TempDir::new("hot-data-test").unwrap();
-        let image_path = tmpdir.path().join("xfs-image");
-        let mount_dir = tmpdir.path().join("xfs-mount-point");
-
-        let image_file = std::fs::File::create(&image_path).unwrap();
-        assert!(image_file.set_len(1024*1024*100).is_ok());
-        assert!(image_file.sync_all().is_ok());
-
-        assert!(std::fs::create_dir(&mount_dir).is_ok());
-
-        assert!(Command::new("mkfs.xfs").arg(&image_path.as_os_str()).status().is_ok());
-        assert!(Command::new("sudo").arg("mount").arg("-o").arg("hot_track").arg(&image_path.as_os_str()).arg(&mount_dir.as_os_str()).status().is_ok());
-        assert!(Command::new("sudo").arg("chmod").arg("777").arg(&mount_dir.as_os_str()).status().is_ok());
-
-        HotDataSupportingFixture { base_dir : mount_dir,
-                                   fs_image_file : image_file,
-                                   fs_image_dir : tmpdir.into_path() }
+        HotDataFixture { base_dir : mount_dir,
+                         fs_image_file : image_file,
+                         fs_image_dir : tmpdir.into_path() }
     }
 }
 
@@ -139,7 +119,7 @@ fn get_hot_data_returns_unsupported() {
 
 #[test]
 fn get_hot_data_returns_no_data() {
-    let fixture = HotDataSupportingFixture::new_btrfs();
+    let fixture = HotDataFixture::new("mkfs.btrfs");
 
     let test_file = match std::fs::File::create(&fixture.base_dir.join("test")) {
         Ok(file) => file,
@@ -153,7 +133,7 @@ fn get_hot_data_returns_no_data() {
 
 #[test]
 fn get_hot_data_returns_fault() {
-    let fixture = HotDataSupportingFixture::new_btrfs();
+    let fixture = HotDataFixture::new("mkfs.btrfs");
 
     let test_file = match std::fs::File::create(&fixture.base_dir.join("test")) {
         Ok(file) => file,
@@ -179,7 +159,7 @@ use std::io::Read;
 
 #[test]
 fn get_hot_data_has_correct_read_write_count() {
-    let fixture = HotDataSupportingFixture::new_xfs();
+    let fixture = HotDataFixture::new("mkfs.xfs");
     let test_file_name = fixture.base_dir.join("test_file");
 
     {
