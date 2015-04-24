@@ -157,9 +157,8 @@ use std::io::Write;
 #[cfg(test)]
 use std::io::Read;
 
-#[test]
-fn get_hot_data_has_correct_read_write_count() {
-    let fixture = HotDataFixture::new("mkfs.xfs");
+#[cfg(test)]
+fn get_hot_data_has_correct_read_write_count(fixture : &HotDataFixture) {
     let test_file_name = fixture.base_dir.join("test_file");
 
     {
@@ -192,6 +191,16 @@ fn get_hot_data_has_correct_read_write_count() {
 
     assert_eq!(info.num_reads, 1);
     assert_eq!(info.num_writes, 1);
+}
+
+#[test]
+fn btrfs_has_correct_read_write_count() {
+    get_hot_data_has_correct_read_write_count(&HotDataFixture::new("mkfs.btrfs"));
+}
+
+#[test]
+fn xfs_has_correct_read_write_count() {
+    get_hot_data_has_correct_read_write_count(&HotDataFixture::new("mkfs.xfs"));
 }
 
 #[repr(C)]
